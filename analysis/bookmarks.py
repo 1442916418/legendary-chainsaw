@@ -1,23 +1,24 @@
 from html.parser import HTMLParser
 import json
+from datetime import datetime
 
 
 class MyHTMLParser(HTMLParser):
+    # 读取 html 标签
     def __init__(self):
         HTMLParser.__init__(self)
         self.data = []
-        self.name = ''
-        self.url = ''
-        self.icon = ''
+        self.curStartTag = ''
+        self.tagA = 'a'
 
     # 开始标记
     def handle_starttag(self, tag, attrs):
         # print('handle_starttag tag: <%s>' % tag)
         # print('handle_starttag attrs: <%s>' % attrs)
-        if tag == "a":
-            if len(attrs) == 0:
-                pass
-            else:
+        self.curStartTag = tag
+
+        if tag == self.tagA:
+            if len(attrs) != 0:
                 for (variable, value) in attrs:
                     if variable == "href" or variable == "icon":
                         self.data.append(value)
@@ -28,7 +29,7 @@ class MyHTMLParser(HTMLParser):
 
     # 数据
     def handle_data(self, data):
-        if data:
+        if data and self.curStartTag == self.tagA:
             res = data.replace('\n', '').replace('\r', '').replace(' ', '')
             if res:
                 # print('handle_data data: ', res)
@@ -48,38 +49,75 @@ class MyHTMLParser(HTMLParser):
 
 
 def ArrayToJson(list):
-    if len(list) == 0:
+    listLen = len(list)
+    if listLen == 0:
         return
 
     result = []
 
-    for i in range(0, 10, 2):
+    for i in range(0, listLen, 3):
+        urlIndex = i
+        iconIndex = i + 1
+        titleIndex = i + 2
+
+        if urlIndex >= listLen:
+            urlIndex = listLen - 1
+
+        if iconIndex >= listLen:
+            iconIndex = listLen - 1
+
+        if titleIndex >= listLen:
+            titleIndex = listLen - 1
+
         item = {
-            'url': list[i],
-            'icon': list[i + 1],
-            'title': list[i + 2]
+            'url': list[urlIndex],
+            'icon': list[iconIndex],
+            'title': list[titleIndex]
         }
         result.append(item)
 
     return result
 
 
-if __name__ == "__main__":
-    htmlData = ''
+def getYMD(y='', m='', d=''):
+    year = y or datetime.now().year
+    month = m or datetime.now().month
+    day = d or datetime.now().day
 
-    with open('D:\\code\\A_2\\python\\analysis\\bookmarks.txt', encoding='utf-8') as f:
+    return '_%s_%s_%s' % (year, month, day)
+
+
+def HTMLtoJSON():
+    htmlData = ''
+    date = getYMD()
+    openFilePath = 'analysis\\assets\\bookmarks' + date + '.html'
+    openWriteArrFilePath = 'analysis\\dist\\arr_bookmarks' + date + '.json'
+    openWriteJsonFilePath = 'analysis\\dist\\json_bookmarks' + date + '.json'
+
+    # 打开 html 文件
+    with open(openFilePath, encoding='utf-8') as f:
         htmlData = f.read()
+        f.close()
 
     if htmlData:
+        # 读取 html 标签
         parser = MyHTMLParser()
         parser.feed(htmlData)
         parser.close()
 
+        with open(openWriteArrFilePath, 'w', encoding='utf-8') as wr:
+            wr.write(json.dumps(parser.data, indent=2, ensure_ascii=False))
+            print('TXT 写入结束')
+            wr.close()
+
         res = ArrayToJson(parser.data)
 
         if res:
-            with open('D:\\code\\A_2\\python\\analysis\\new_bookmarks.json', 'w+') as wr:
-                # wr.write(res)
-                json.dump(res, wr, ensure_ascii=False)
-                print('写入结束')
+            with open(openWriteJsonFilePath, 'w', encoding='utf-8') as wr:
+                wr.write(json.dumps(res, indent=4, ensure_ascii=False))
+                print('JSON 写入结束')
                 wr.close()
+
+
+if __name__ == "__main__":
+    HTMLtoJSON()
